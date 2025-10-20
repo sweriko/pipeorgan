@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en-US">
+
+<head>
+
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <meta name="N.P. Brosowsky" content="Tone.js instrument organ-only demo" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ToneJS-Instruments Organ - Isolated</title>
+
+</head>
+
+<body>
+    <style type="text/css">
+        body {
+            height: 100vh;
+            width: 100vw;
+            font-family: Helvetica, arial;
+            font-size: 16px;
+        }
+
+        #content {
+            height: 100%;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            display: none;
+        }
+
+        #Keyboard {
+            margin: 3px!important;
+        }
+
+        /* per-key labels */
+        .key-label {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 4px;
+            font-size: 11px;
+            line-height: 1;
+            font-family: Helvetica, arial;
+            color: #222;
+            user-select: none;
+            pointer-events: none;
+            z-index: 5;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+        }
+        .key-label.dark {
+            color: #fff;
+            text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+        }
+    </style>
+    <div id="content">
+        <H3 id="loading">Loading organ samples…</H3>
+        <div class="container">
+            <h1> Organ (isolated)</h1>
+            <p> labels shown, German keyboard: qwertzuiopasdfghjklöä / 1234567890ß´ü+#</p>
+            <div id="Keyboard"></div>
+        </div>
+    </div>
+
+    <script type="text/javascript" src="../external-js/NexusUI.js"></script>
+    <script type="text/javascript" src="../external-js/Tone.js"></script>
+    <script type="text/javascript" src="../Tonejs-Instruments.js"></script>
+
+    <script>
+        // load only organ
+        var samples = SampleLibrary.load({
+            instruments: ['organ'],
+            baseUrl: "./"
+        })
+
+        var current;
+
+        Tone.Buffer.on('load', function() {
+            document.querySelector(".container").style.display = 'block';
+            document.querySelector("#loading").style.display = 'none';
+
+            samples['organ'].release = .5;
+            samples['organ'].toMaster();
+            current = samples['organ'];
+        })
+
+        Tone.Buffer.on('error', function() {
+            document.querySelector("#loading").innerHTML = "Error loading samples. Try a recent Chromium-based browser.";
+        })
+
+        // create Nexus UI keyboard
+        Nexus.colors.accent = "#f00";
+        var keyboardUI = new Nexus.Piano('#Keyboard', {
+            'size': [1000, 125],
+            'mode': 'button',
+            'lowNote': 36,
+            'highNote': 72
+        })
+
+        // instrument name used for labeling
+        var currentInstrumentName = 'organ';
+        var labelOctaveOffsetByInstrument = { 'organ': -1 };
+
+        function noteNameWithOffset(midi, instrumentName) {
+            var n = Tone.Frequency(midi, "midi").toNote();
+            var m = n.match(/^([A-G]#?)(-?\d+)$/);
+            if (!m) return n;
+            var base = m[1];
+            var oct = parseInt(m[2], 10);
+            var offset = labelOctaveOffsetByInstrument[instrumentName] || 0;
+            return base + (oct + offset);
+        }
+
+        // labels
+        function addKeyLabels() {
+            if (!keyboardUI || !keyboardUI.keys) return;
+            for (var i = 0; i < keyboardUI.keys.length; i++) {
+                var key = keyboardUI.keys[i];
+                var container = key.parent;
+                var label = container.querySelector('.key-label');
+                if (!label) {
+                    label = document.createElement('div');
+                    label.className = 'key-label';
+                    container.appendChild(label);
+                }
+                label.textContent = noteNameWithOffset(key.note, currentInstrumentName);
+                if (key.color === 'b') {
+                    label.classList.add('dark');
+                } else {
+                    label.classList.remove('dark');
+                }
+            }
+        }
+        function showKeyLabels(show) {
+            var labels = document.querySelectorAll('#Keyboard .key-label');
+            for (var i = 0; i < labels.length; i++) {
+                labels[i].style.display = show ? 'block' : 'none';
+            }
+        }
+
+        // German keyboard mapping
+        var WHITE_KEYS = "qwertzuiopasdfghjklöä".split('');
+        var BLACK_KEYS = "1234567890ß´ü+#".split('');
+        var charToIndex = {};
+        var indexToChar = {};
+
+        function buildKeyMaps() {
+            charToIndex = {};
+            indexToChar = {};
+            var w = 0, b = 0;
+            for (var i = 0; i < keyboardUI.keys.length; i++) {
+                var color = keyboardUI.keys[i].color;
+                if (color === 'w' && w < WHITE_KEYS.length) {
+                    var ch = WHITE_KEYS[w++];
+                    charToIndex[ch] = i;
+                    indexToChar[i] = ch;
+                } else if (color === 'b' && b < BLACK_KEYS.length) {
+                    var chb = BLACK_KEYS[b++];
+                    charToIndex[chb] = i;
+                    indexToChar[i] = chb;
+                }
+            }
+        }
+
+        function normalizeKey(evt) {
+            var k = evt.key || '';
+            if (k === 'Dead') return '´';
+            if (k.length === 1) return k.toLowerCase();
+            if (k === 'Add') return '+';
+            return k.toLowerCase();
+        }
+
+        var activeChars = {};
+        var audioStarted = false;
+        function ensureAudio() {
+            if (audioStarted) return;
+            try {
+                if (Tone.start) { Tone.start(); }
+                else if (Tone.context && Tone.context.resume) { Tone.context.resume(); }
+            } catch (e) {}
+            audioStarted = true;
+        }
+
+        document.addEventListener('keydown', function(e) {
+            var k = normalizeKey(e);
+            var idx = charToIndex[k];
+            if (idx === undefined) return;
+            ensureAudio();
+            if (activeChars[k]) { e.preventDefault(); return; }
+            activeChars[k] = true;
+            keyboardUI.keys[idx].down(true);
+            e.preventDefault();
+        });
+
+        document.addEventListener('keyup', function(e) {
+            var k = normalizeKey(e);
+            var idx = charToIndex[k];
+            if (idx === undefined) return;
+            if (activeChars[k]) {
+                keyboardUI.keys[idx].up();
+                delete activeChars[k];
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('blur', function() {
+            for (var ch in activeChars) {
+                var idx = charToIndex[ch];
+                if (idx !== undefined) {
+                    keyboardUI.keys[idx].up();
+                }
+            }
+            activeChars = {};
+        });
+
+        // set up labels + mapping immediately after keys exist
+        addKeyLabels();
+        showKeyLabels(true);
+        buildKeyMaps();
+
+        // audio routing
+        keyboardUI.on('change', function(note) {
+            var nn = Tone.Frequency(note.note, "midi").toNote();
+            if (note.state === true) {
+                current && current.triggerAttack(nn);
+            } else if (note.state === false) {
+                current && current.triggerRelease(nn);
+            }
+        })
+    </script>
+
+</body>
+
+</html>

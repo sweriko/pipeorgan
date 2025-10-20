@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Organ + Three + Tone (Vite TS)</title>
+    <style>
+      html, body, #app { height: 100%; margin: 0; }
+      #overlay { position: fixed; top: 8px; left: 8px; padding: 8px 10px; background: rgba(0,0,0,0.5); color: #fff; font: 14px/1.4 system-ui, sans-serif; border-radius: 6px; }
+      #hint { opacity: 0.8; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="overlay">
+      <div><strong>German keys</strong> white: qwertzuiopasdfghjklöä</div>
+      <div><strong>German keys</strong> black: 1234567890ß´ü+#</div>
+      <div id="hint">Click or press a key to enable audio</div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
