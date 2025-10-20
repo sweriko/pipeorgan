@@ -30,7 +30,11 @@ function normalizeKey(e: KeyboardEvent): string {
   return k.length === 1 ? k.toLowerCase() : k.toLowerCase();
 }
 
-export function bindGermanKeyboard(organ: Tone.Sampler) {
+export function bindGermanKeyboard(
+  organ: Tone.Sampler,
+  onDown?: (note: string, midi: number) => void,
+  onUp?: (note: string, midi: number) => void
+) {
   const charToMidi = buildCharToMidi();
   const down = new Set<string>();
 
@@ -40,7 +44,9 @@ export function bindGermanKeyboard(organ: Tone.Sampler) {
     if (midi === undefined) return;
     if (down.has(ch)) { e.preventDefault(); return; }
     down.add(ch);
-    organ.triggerAttack(Tone.Frequency(midi, 'midi').toNote());
+    const note = Tone.Frequency(midi, 'midi').toNote();
+    organ.triggerAttack(note);
+    if (onDown) onDown(note, midi);
     e.preventDefault();
   });
 
@@ -49,7 +55,9 @@ export function bindGermanKeyboard(organ: Tone.Sampler) {
     const midi = charToMidi.get(ch);
     if (midi === undefined) return;
     if (down.has(ch)) {
-      organ.triggerRelease(Tone.Frequency(midi, 'midi').toNote());
+      const note = Tone.Frequency(midi, 'midi').toNote();
+      organ.triggerRelease(note);
+      if (onUp) onUp(note, midi);
       down.delete(ch);
       e.preventDefault();
     }
@@ -58,7 +66,11 @@ export function bindGermanKeyboard(organ: Tone.Sampler) {
   window.addEventListener('blur', () => {
     for (const ch of down) {
       const midi = charToMidi.get(ch);
-      if (midi !== undefined) organ.triggerRelease(Tone.Frequency(midi, 'midi').toNote());
+      if (midi !== undefined) {
+        const note = Tone.Frequency(midi, 'midi').toNote();
+        organ.triggerRelease(note);
+        if (onUp) onUp(note, midi);
+      }
     }
     down.clear();
   });
